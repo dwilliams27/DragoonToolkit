@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -8,10 +9,8 @@ using System.Threading.Tasks;
 
 namespace DragoonToolkit.Dolphin
 {
-    static internal class MemoryUtils
+    public static class MemoryUtils
     {
-        const int PROCESS_WM_READ = 0x0010;
-
         public enum AllocationProtectEnum : uint
         {
             PAGE_EXECUTE = 0x00000010,
@@ -62,64 +61,36 @@ namespace DragoonToolkit.Dolphin
             public PSAPI_WORKING_SET_EX_BLOCK VirtualAttributes;
         }
 
+        public static byte[] ConvertHexStringToByteArray(string hexString)
+        {
+            if (hexString.Length % 2 != 0)
+            {
+                throw new ArgumentException(String.Format(CultureInfo.InvariantCulture, "The binary key cannot have an odd number of digits: {0}", hexString));
+            }
+
+            byte[] data = new byte[hexString.Length / 2];
+            for (int index = 0; index < data.Length; index++)
+            {
+                string byteValue = hexString.Substring(index * 2, 2);
+                data[index] = byte.Parse(byteValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            }
+
+            return data;
+        }
+
         [DllImport("kernel32.dll")]
         public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
         [DllImport("kernel32.dll")]
-        public static extern bool ReadProcessMemory(int hProcess, int lpBaseAddress, byte[] lpBuffer, int dwSize, ref int lpNumberOfBytesRead);
+        public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out IntPtr lpNumberOfBytesWritten);
 
         [DllImport("kernel32.dll")]
         public static extern uint VirtualQueryEx(IntPtr hProcess, IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
 
         [DllImport("Psapi.dll")]
         public static extern uint QueryWorkingSetEx(IntPtr hProcess, out PSAPI_WORKING_SET_EX_INFORMATION ws, long cb);
-        public static string CaptureDolphinRAMLocation(Process process)
-        {
-            IntPtr processHandle = OpenProcess(PROCESS_WM_READ, false, process.Id);
-            MEMORY_BASIC_INFORMATION MEM_INFO;
-
-            long CurrentAddress = 0x00000000;
-            long MEM1StartAddress = 0x00000000;
-            long ARAMStartAddress = 0x00000000;
-            bool FoundMEM1 = false;
-            uint RetVal = (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION));
-            while(RetVal == (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION)))
-            {
-                RetVal = VirtualQueryEx(process.Handle, (IntPtr)CurrentAddress, out MEM_INFO, (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION)));
-                if((long)MEM_INFO.RegionSize == 0x2000000 && MEM_INFO.Type == TypeEnum.MEM_MAPPED)
-                {
-                    if(!FoundMEM1)
-                    {
-                        MEM1StartAddress = (long)MEM_INFO.BaseAddress;
-                        string AddressInHex = MEM1StartAddress.ToString("x");
-                        Trace.WriteLine($"MEM1 Starting Address: {AddressInHex}");
-                        FoundMEM1 = true;
-                    } else
-                    {
-                        if (MEM1StartAddress + 0x2000000 == CurrentAddress)
-                        {
-                            ARAMStartAddress = CurrentAddress;
-                            break;
-                        }
-                    }
-                    // TODO: Need to check page has valid working set (BROKEN)
-                    // PSAPI_WORKING_SET_EX_INFORMATION ws;
-                    // worked = QueryWorkingSetEx(process.Handle, out ws, (uint)Marshal.SizeOf(typeof(PSAPI_WORKING_SET_EX_INFORMATION)));
-                    // Trace.WriteLine(worked);
-                    // Trace.WriteLine((uint)Marshal.SizeOf(typeof(PSAPI_WORKING_SET_EX_BLOCK)));
-                    // Trace.WriteLine((uint)Marshal.SizeOf(typeof(PSAPI_WORKING_SET_EX_INFORMATION)));
-                    // Trace.WriteLine((long)ws.VirtualAttributes.Valid);
-                }
-                CurrentAddress += (long)MEM_INFO.RegionSize;
-            }
-
-            if(MEM1StartAddress == 0x00000000)
-            {
-                Trace.WriteLine("Dolphin running but not game");
-                return "bad";
-            }
-            
-            return "good";
-        }
     }
 }
