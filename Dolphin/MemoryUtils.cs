@@ -61,6 +61,20 @@ namespace DragoonToolkit.Dolphin
             public PSAPI_WORKING_SET_EX_BLOCK VirtualAttributes;
         }
 
+        public static string ToHexString(float f)
+        {
+            var bytes = BitConverter.GetBytes(f);
+            var i = BitConverter.ToInt32(bytes, 0);
+            return i.ToString("X8");
+        }
+
+        public static float FromHexString(string s)
+        {
+            var i = Convert.ToInt32(s, 16);
+            var bytes = BitConverter.GetBytes(i);
+            return BitConverter.ToSingle(bytes, 0);
+        }
+
         public static byte[] ConvertHexStringToByteArray(string hexString)
         {
             if (hexString.Length % 2 != 0)
@@ -76,6 +90,14 @@ namespace DragoonToolkit.Dolphin
             }
 
             return data;
+        }
+
+        public static string GenerateRandomHexFromFloats(float min, float max)
+        {
+            System.Random random = new System.Random();
+            double val = (random.NextDouble() * (max - min) + min);
+            Trace.WriteLine($"Generated {(float)val}");
+            return ToHexString((float)val);
         }
 
         [DllImport("kernel32.dll")]

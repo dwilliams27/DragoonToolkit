@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using static DragoonToolkit.Dolphin.MemoryUtils;
+using static DragoonToolkit.Services.KARPlayerService;
+using static DragoonToolkit.Models.KARAddressBook;
 
 namespace DragoonToolkit.Dolphin
 {
@@ -42,10 +44,17 @@ namespace DragoonToolkit.Dolphin
 
             CaptureDolphinRAMLocation();
 
-            byte[] buffer = new byte[4];
-            ReadFromMemory(0x00000000, buffer, 4);
-            WriteToMemory(0x00000000, ConvertHexStringToByteArray("DDDDDDDD"), 4);
-            ReadFromMemory(0x00000000, buffer, 4);
+            string lHeight = GenerateRandomHexFromFloats(PLAYER_FOOT_ATTACH_MIN, PLAYER_FOOT_ATTACH_MAX);
+            string rHeight = GenerateRandomHexFromFloats(PLAYER_FOOT_ATTACH_MIN, PLAYER_FOOT_ATTACH_MAX);
+            string size = GenerateRandomHexFromFloats(0.8f, 1.2f);
+            ChangeP1MaxLiftAngle(this, "459C4000");
+            int count = 0;
+            while(count < 200)
+            {
+                ResizeP1Character(this, size);
+                ChangeP1Feet(this, lHeight, rHeight);
+                count++;
+            }
         }
 
         public long[] CaptureDolphinRAMLocation()
@@ -105,9 +114,13 @@ namespace DragoonToolkit.Dolphin
             
             IntPtr amountRead;
             bool success = ReadProcessMemory(DProcess.Handle, (IntPtr)address, buffer, size, out amountRead);
-            Trace.WriteLine(Convert.ToHexString(buffer));
 
             return Convert.ToHexString(buffer);
+        }
+
+        public string WriteToMemory8(uint offset, byte[] buffer, uint size, bool withBSwap = false)
+        {
+            return WriteToMemory(offset - 0x80000000, buffer, size, withBSwap);
         }
 
         public string WriteToMemory(uint offset, byte[] buffer, uint size, bool withBSwap = false)
@@ -116,7 +129,6 @@ namespace DragoonToolkit.Dolphin
 
             IntPtr amountRead;
             bool success = WriteProcessMemory(DProcess.Handle, (IntPtr)address, buffer, size, out amountRead);
-            Trace.WriteLine(Convert.ToHexString(buffer));
 
             return Convert.ToHexString(buffer);
         }
